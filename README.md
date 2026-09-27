@@ -30,7 +30,6 @@ This repository demonstrates how to deploy and operate an n8n automation platfor
                  ▼                     ▼
           ┌─────────────┐       ┌─────────────┐
           │ PostgreSQL  │       │    Redis    │
-          │    16       │       │     7       │
           └─────────────┘       └─────────────┘
 ```
 
