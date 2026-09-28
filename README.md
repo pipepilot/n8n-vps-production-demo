@@ -2,11 +2,9 @@
 
 **Self-hosted n8n deployment on a Linux VPS using Docker, PostgreSQL, Redis and Caddy.**
 
-This repository demonstrates how to deploy and operate an n8n automation platform on a Linux VPS with persistent storage, database support, Redis and HTTPS.
+This repository demonstrates a practical self-hosted automation stack with persistent storage, Redis-backed queue execution and HTTPS termination.
 
-> This is a demonstration / portfolio project. It does not contain production credentials or private infrastructure data.
-
----
+> Portfolio / demonstration project. Do not use the example credentials in production.
 
 ## Architecture
 
@@ -22,18 +20,22 @@ This repository demonstrates how to deploy and operate an n8n automation platfor
                             ▼
                     ┌───────────────┐
                     │      n8n      │
-                    │  Automation   │
+                    │    Main       │
                     └───────┬───────┘
                             │
-                 ┌──────────┴──────────┐
-                 │                     │
-                 ▼                     ▼
-          ┌─────────────┐       ┌─────────────┐
-          │ PostgreSQL  │       │    Redis    │
-          └─────────────┘       └─────────────┘
+                  ┌─────────┴─────────┐
+                  │                   │
+                  ▼                   ▼
+          ┌─────────────┐      ┌─────────────┐
+          │ PostgreSQL  │      │    Redis    │
+          │     16      │      │     7       │
+          └─────────────┘      └──────┬──────┘
+                                      │
+                                      ▼
+                               ┌─────────────┐
+                               │ n8n Worker  │
+                               └─────────────┘
 ```
-
----
 
 ## Stack
 
@@ -43,21 +45,18 @@ This repository demonstrates how to deploy and operate an n8n automation platfor
 | Docker | Container runtime |
 | Docker Compose | Service orchestration |
 | n8n | Automation platform |
-| PostgreSQL | Persistent n8n database |
-| Redis | Queue / execution infrastructure |
-| Caddy | Reverse proxy |
-| Let's Encrypt | TLS certificates |
+| PostgreSQL 16 | Persistent database |
+| Redis 7 | Queue backend |
+| Caddy | Reverse proxy / HTTPS |
 | SSH | Server administration |
-
----
 
 ## Project Structure
 
 ```text
 n8n-vps-production-demo/
-│
 ├── docker-compose.yml
 ├── .env.example
+├── .gitignore
 ├── Caddyfile
 ├── README.md
 │
@@ -72,292 +71,121 @@ n8n-vps-production-demo/
     └── troubleshooting.md
 ```
 
----
-
-## Services
-
-### n8n
-
-The main automation platform.
-
-Responsibilities:
-
-- workflow execution
-- webhook processing
-- API integrations
-- Telegram integrations
-- automation logic
-
-### PostgreSQL
-
-Used as the persistent database for n8n.
-
-The database stores n8n configuration and execution-related data.
-
-### Redis
-
-Provides Redis-backed infrastructure for queue-based n8n deployments.
-
-### Caddy
-
-Acts as the public reverse proxy.
-
-Responsibilities:
-
-- HTTPS
-- TLS certificate management
-- reverse proxy
-- HTTP security configuration
-- access logging
-
----
-
 ## Deployment
 
-### 1. Clone the repository
+### 1. Clone
 
 ```bash
 git clone https://github.com/[USERNAME]/n8n-vps-production-demo.git
 cd n8n-vps-production-demo
 ```
 
-### 2. Create environment configuration
+### 2. Configure environment
 
 ```bash
 cp .env.example .env
 nano .env
 ```
 
-Example:
+Generate a strong encryption key:
 
-```env
-POSTGRES_DB=n8n
-POSTGRES_USER=n8n
-POSTGRES_PASSWORD=change_me
-
-N8N_HOST=n8n.example.com
-N8N_PROTOCOL=https
-
-N8N_ENCRYPTION_KEY=change_me_to_a_long_random_value
-
-REDIS_HOST=redis
-REDIS_PORT=6379
+```bash
+openssl rand -hex 32
 ```
 
-> Never commit `.env` to Git.
-
----
+Use the generated value for `N8N_ENCRYPTION_KEY`.
 
 ### 3. Start the stack
 
 ```bash
+docker compose pull
 docker compose up -d
 ```
 
-Check containers:
+Check status:
 
 ```bash
 docker compose ps
 ```
 
----
-
-## Logs
-
-Check all services:
+### 4. Validate configuration
 
 ```bash
-docker compose logs
+docker compose config
 ```
 
-n8n:
+### 5. Check HTTPS
 
-```bash
-docker compose logs -f n8n
-```
-
-PostgreSQL:
-
-```bash
-docker compose logs -f postgres
-```
-
-Redis:
-
-```bash
-docker compose logs -f redis
-```
-
-Caddy:
-
-```bash
-docker compose logs -f caddy
-```
-
----
-
-## Health Checks
-
-Basic container check:
-
-```bash
-docker compose ps
-```
-
-Check listening ports:
-
-```bash
-ss -tulpn
-```
-
-Check HTTPS:
+After DNS points the hostname to the VPS:
 
 ```bash
 curl -I https://n8n.example.com
 ```
 
-Check DNS:
-
-```bash
-dig n8n.example.com
-```
-
----
-
-## Backup
-
-A production-style deployment should have a recovery procedure, not only a backup command.
-
-Example PostgreSQL backup:
-
-```bash
-docker compose exec -T postgres \
-  pg_dump -U n8n n8n > backup.sql
-```
-
-Restore example:
-
-```bash
-cat backup.sql | \
-docker compose exec -T postgres \
-  psql -U n8n n8n
-```
-
-For real deployments, backups should additionally consider:
-
-- encryption
-- off-server storage
-- retention
-- scheduled execution
-- restore testing
-
----
-
-## Troubleshooting Workflow
-
-When a service does not work:
-
-```text
-Problem
-   │
-   ▼
-docker compose ps
-   │
-   ▼
-Check container logs
-   │
-   ▼
-Check configuration
-   │
-   ▼
-Check networking
-   │
-   ▼
-Check DNS / HTTPS
-   │
-   ▼
-Test with curl
-   │
-   ▼
-Apply fix
-   │
-   ▼
-Verify
-```
-
-Typical commands:
+## Useful Commands
 
 ```bash
 docker compose ps
 docker compose logs --tail=100 n8n
-docker inspect n8n
-docker network inspect <network>
-curl -I https://n8n.example.com
-ss -tulpn
-dig n8n.example.com
+docker compose logs --tail=100 worker
+docker compose logs --tail=100 postgres
+docker compose logs --tail=100 redis
+docker compose logs --tail=100 caddy
 ```
 
----
+## Backup
 
-## Security Considerations
+Create a PostgreSQL backup:
 
-This demo follows several basic security principles:
+```bash
+./scripts/backup.sh
+```
 
-- secrets are stored outside Git
-- `.env` is excluded from the repository
-- `.env.example` contains placeholders only
-- HTTPS is used for public access
-- database ports do not need to be publicly exposed
-- containers communicate through an internal Docker network
-- SSH access should use keys rather than passwords where possible
+Restore a selected SQL dump:
 
----
+```bash
+./scripts/restore.sh backups/n8n_YYYYMMDD_HHMMSS.sql
+```
+
+Restore should be tested on a non-production copy before relying on it for disaster recovery.
+
+## Health Check
+
+```bash
+./scripts/healthcheck.sh
+```
+
+The script checks:
+
+- Docker Compose service state
+- PostgreSQL readiness
+- Redis responsiveness
+- local n8n HTTP response
+- Caddy container state
+
+## Security Notes
+
+- `.env` is ignored by Git.
+- Database and Redis ports are not published to the Internet.
+- HTTPS is terminated by Caddy.
+- Credentials belong in environment variables or n8n credentials.
+- SSH should use key-based authentication.
+- Backups should be stored off the VPS for real deployments.
 
 ## Production Checklist
 
-Before using a similar configuration for a real service:
-
-- [ ] Strong PostgreSQL password
-- [ ] Strong n8n encryption key
-- [ ] `.env` excluded from Git
-- [ ] HTTPS enabled
-- [ ] DNS correctly configured
+- [ ] Strong passwords
+- [ ] Strong `N8N_ENCRYPTION_KEY`
 - [ ] Firewall configured
-- [ ] SSH secured
-- [ ] Backups configured
-- [ ] Backup restoration tested
-- [ ] Logs reviewed
-- [ ] Resource usage monitored
-
----
-
-## What This Project Demonstrates
-
-This project demonstrates practical experience with:
-
-- Linux VPS deployment
-- Docker
-- Docker Compose
-- n8n
-- PostgreSQL
-- Redis
-- Caddy
-- HTTPS / TLS
-- DNS
-- SSH
-- backups
-- troubleshooting
-
----
+- [ ] SSH hardened
+- [ ] DNS verified
+- [ ] HTTPS verified
+- [ ] Backups scheduled
+- [ ] Off-server backup copy
+- [ ] Restore procedure tested
+- [ ] Monitoring configured
+- [ ] Resource limits reviewed
 
 ## Disclaimer
 
-This repository is a portfolio demonstration.
-
-Configuration should be reviewed and adapted before use in a real production environment.
-
----
-
-## License
-
-This project is provided for educational and demonstration purposes.
+This repository is a portfolio demonstration. Review all configuration for the target environment before production use.

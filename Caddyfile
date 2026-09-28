@@ -1,0 +1,16 @@
+{$N8N_HOST} {
+    encode gzip
+
+    log {
+        output file /var/log/caddy/access.log
+        format json
+    }
+
+    header {
+        X-Content-Type-Options "nosniff"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        Permissions-Policy "geolocation=()"
+    }
+
+    reverse_proxy n8n:5678
+}
